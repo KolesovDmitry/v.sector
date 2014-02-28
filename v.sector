@@ -1,0 +1,167 @@
+#!/usr/bin/env python
+# -*- coding: utf-8  -*-
+#
+############################################################################
+#
+# MODULE:      v.sector
+# AUTHOR(S):   Dmitry Kolesov (kolesov.dm@gmail.com);
+#
+# PURPOSE:     Create circle sector by coordinates of the circle center
+#              and two angles which are borders of the sector.
+#
+# COPYRIGHT:   (C) 2013 Dmitry Kolesov / GRASS Development Team
+#
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+############################################################################
+
+#%Module
+#% description: Create circle sectors by coordinates of the circle center and two angles which are the borders of the sector.
+#%End
+#%option
+#% key: input
+#% type: string
+#% description: name of the input vector map (points will be used only)
+#% required : yes
+#% multiple: no
+#%end
+#%option
+#% key: output
+#% type: string
+#% description: prefix of the output vector map name
+#% required : yes
+#% multiple: no
+#%end
+#%option
+#% key: cat
+#% type: string
+#% description: column of category of the center points
+#% required : no
+#% multiple: no
+#%end
+#%option
+#% key: layer
+#% type: integer
+#% description: layer of the map
+#% required : no
+#% multiple: no
+#%end
+#%option
+#% key: radius
+#% type: string
+#% description: column of the radius of the center points
+#% required : no
+#% multiple: no
+#%end
+#%option
+#% key: x
+#% type: string
+#% description: column of x coordinate of the center points
+#% required : yes
+#% multiple: no
+#%end
+#%option
+#% key: y
+#% type: string
+#% description: column of y coordinate of the center points
+#% required : yes
+#% multiple: no
+#%end
+#%option
+#% key: min_angle
+#% type: string
+#% description: colunm of azimuth of the first sector boundary (min angle of the sector)
+#% required : yes
+#% multiple: no
+#%end
+#%option
+#% key: max_angle
+#% type: string
+#% description: colunm of azimuth of the second sector boundary (max angle of the sector)
+#% required : yes
+#% multiple: no
+#%end
+
+import string
+import os, sys
+import time
+from math import sin,cos,radians
+
+if "GISBASE" not in os.environ:
+    print "You must be in GRASS GIS to run this program."
+    sys.exit(1)
+
+import grass.script as grass
+
+
+def asciiSector(x,y, radius, minA, maxA, nPoints, cat, layer=1):
+    minA, maxA = radians(90- minA), radians(90-maxA)
+    dA = 1.0*(maxA - minA)/(nPoints - 1)
+    a = minA
+
+    points = u"B %s\n" % (nPoints + 2, )
+    points += u"  %s %s\n" % (x,y)
+    for i in range(nPoints):
+        newX = x + radius*cos(a)
+        newY = y + radius*sin(a)
+        points += u"  %s %s\n" % (newX, newY)
+        a = a + dA
+    points += u"  %s %s\n" % (x,y)
+
+    centr = u"C 1 1\n"
+    a = 1.0*(maxA - minA)/2 + minA
+    newX = x + radius*cos(a)/1000
+    newY = y + radius*sin(a)/1000
+    centr += u"  %s %s\n" % (newX, newY)
+
+    objid = u"  %s %s\n" % (layer, cat)
+    
+    sector = points + centr + objid
+
+    return sector
+
+def main(options, flags):
+    in_map  = options['input']
+    prefix = options['output']
+    catField = options['cat']
+    if not catField:
+        catField = 'cat'
+    xField = options['x']
+    yField = options['y']
+    rField = options['radius']
+    if not rField:
+        rField = "1000"
+    minAField = options['min_angle']
+    maxAField = options['max_angle']
+    layer = options['layer']
+    if not layer:
+        layer = 1
+
+    nPoints = 15
+
+    columns = ','.join([catField, xField, yField, rField, minAField,maxAField])
+    p1 = grass.pipe_command('v.db.select', map=in_map, layer=layer, columns=columns, flags='c', quiet=True)
+
+    for line in p1.stdout:
+        cat, x, y, r, minA,maxA = line.split("|")
+        data = asciiSector(float(x), float(y), float(r), float(minA), float(maxA), nPoints, cat, layer)
+        out_map = prefix + str(cat)
+        p2 = grass.feed_command('v.in.ascii', input='-', output=out_map, format='standard', overwrite=True, quiet=True, flags='n')
+        p2.stdin.write(data)
+        p2.stdin.close()
+        p2.wait()
+    p1.wait()
+
+if __name__ == "__main__":
+    options, flags = grass.parser()
+    main(options, flags)
+    sys.exit(0)
+
