@@ -171,9 +171,13 @@ def main(options, flags):
             from_driver=driver, to_driver=driver,
             from_table=table, to_table=out_map,
             from_database=db, to_database=db,
-            where="%s=%s" % (field, cat)
+            where="%s=%s" % (field, cat),
+            quiet=True
         )
-        grass.run_command('v.db.connect', map=out_map, driver=driver, database=db, key=field, layer=1, table=out_map)
+        grass.run_command('v.db.connect', 
+            map=out_map, driver=driver, database=db, key=field, layer=1, table=out_map, 
+            quiet=True
+        )
     p1.wait()
     
 
