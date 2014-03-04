@@ -146,6 +146,12 @@ def main(options, flags):
         layer = 1
 
     nPoints = 15
+    
+    # Get information about database connection 
+    p1 = grass.pipe_command('v.db.connect', map=in_map, flags='g')
+    conn_info = p1.stdout.readline()
+    p1.wait()
+    layer, table, field, db, driver = conn_info.split()
 
     columns = ','.join([catField, xField, yField, rField, minAField,maxAField])
     p1 = grass.pipe_command('v.db.select', map=in_map, layer=layer, columns=columns, flags='c', quiet=True)
@@ -158,7 +164,18 @@ def main(options, flags):
         p2.stdin.write(data)
         p2.stdin.close()
         p2.wait()
+        
+        # Copy attributes
+        grass.run_command(
+            'db.copy', 
+            from_driver=driver, to_driver=driver,
+            from_table=table, to_table=out_map,
+            from_database=db, to_database=db,
+            where="%s=%s" % (field, cat)
+        )
+        grass.run_command('v.db.connect', map=out_map, driver=driver, database=db, key=field, layer=1, table=out_map)
     p1.wait()
+    
 
 if __name__ == "__main__":
     options, flags = grass.parser()
