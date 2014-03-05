@@ -90,9 +90,7 @@
 #% multiple: no
 #%end
 
-import string
 import os, sys
-import time
 from math import sin,cos,radians
 
 if "GISBASE" not in os.environ:
@@ -156,6 +154,7 @@ def main(options, flags):
     columns = ','.join([catField, xField, yField, rField, minAField,maxAField])
     p1 = grass.pipe_command('v.db.select', map=in_map, layer=layer, columns=columns, flags='c', quiet=True)
 
+    names = []
     for line in p1.stdout:
         cat, x, y, r, minA,maxA = line.split("|")
         data = asciiSector(float(x), float(y), float(r), float(minA), float(maxA), nPoints, cat, layer)
@@ -178,8 +177,8 @@ def main(options, flags):
             map=out_map, driver=driver, database=db, key=field, layer=1, table=out_map, 
             quiet=True
         )
+        names.append(out_map)
     p1.wait()
-    
 
 if __name__ == "__main__":
     options, flags = grass.parser()
